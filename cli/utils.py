@@ -1,7 +1,11 @@
 import questionary
 from typing import List, Optional, Tuple, Dict
 
+from rich.console import Console
+
 from cli.models import AnalystType
+
+console = Console()
 
 ANALYST_ORDER = [
     ("Market Analyst", AnalystType.MARKET),
@@ -122,44 +126,88 @@ def select_research_depth() -> int:
     return choice
 
 
-def select_shallow_thinking_agent(provider) -> str:
+def select_shallow_thinking_agent(provider: str) -> str:
     """Select shallow thinking llm engine using an interactive selection."""
+    provider_key = (provider or "").strip().lower()
 
     # Define shallow thinking llm engine options with their corresponding model names
     SHALLOW_AGENT_OPTIONS = {
         "openai": [
-            ("GPT-4o-mini - Fast and efficient for quick tasks", "gpt-4o-mini"),
-            ("GPT-4.1-nano - Ultra-lightweight model for basic operations", "gpt-4.1-nano"),
+            ("GPT-4.1 - High quality general model", "gpt-4.1"),
+            ("GPT-5-nano - Ultra-fast and ultra-cheap for trivial tasks", "gpt-5-nano"),
+            ("GPT-5-mini - Fast general-purpose lightweight model", "gpt-5-mini"),
+            (
+                "GPT-4.1-nano - Ultra-lightweight model for basic operations",
+                "gpt-4.1-nano",
+            ),
             ("GPT-4.1-mini - Compact model with good performance", "gpt-4.1-mini"),
-            ("GPT-4o - Standard model with solid capabilities", "gpt-4o"),
+            ("GPT-4o-mini - Fast and efficient for quick tasks", "gpt-4o-mini"),
+            ("GPT-4o - Standard multimodal model", "gpt-4o"),
+            ("o4-mini - Low-cost reasoning model (good default)", "o4-mini"),
         ],
         "anthropic": [
-            ("Claude Haiku 3.5 - Fast inference and standard capabilities", "claude-3-5-haiku-latest"),
-            ("Claude Sonnet 3.5 - Highly capable standard model", "claude-3-5-sonnet-latest"),
-            ("Claude Sonnet 3.7 - Exceptional hybrid reasoning and agentic capabilities", "claude-3-7-sonnet-latest"),
-            ("Claude Sonnet 4 - High performance and excellent reasoning", "claude-sonnet-4-0"),
+            (
+                "Claude Haiku 3.5 - Fast inference and low cost",
+                "claude-3-5-haiku-latest",
+            ),
+            (
+                "Claude Sonnet 3.5 - Strong general reasoning",
+                "claude-3-5-sonnet-latest",
+            ),
+            (
+                "Claude Sonnet 3.7 - Hybrid reasoning & agentic behavior",
+                "claude-3-7-sonnet-latest",
+            ),
+            ("Claude Sonnet 4 - High performance standard model", "claude-sonnet-4-0"),
         ],
         "google": [
-            ("Gemini 2.0 Flash-Lite - Cost efficiency and low latency", "gemini-2.0-flash-lite"),
-            ("Gemini 2.0 Flash - Next generation features, speed, and thinking", "gemini-2.0-flash"),
-            ("Gemini 2.5 Flash - Adaptive thinking, cost efficiency", "gemini-2.5-flash-preview-05-20"),
+            ("Gemini 2.0 Flash-Lite - Lowest latency & cost", "gemini-2.0-flash-lite"),
+            ("Gemini 2.0 Flash - Fast multimodal reasoning", "gemini-2.0-flash"),
+            (
+                "Gemini 2.5 Flash - Adaptive thinking & efficiency (stable)",
+                "gemini-2.5-flash",
+            ),
+            (
+                "Gemini 2.5 Flash - Adaptive thinking & efficiency (preview)",
+                "gemini-2.5-flash-preview",
+            ),
+            (
+                "Gemini 3 Flash - Next-gen lightweight reasoning (stable)",
+                "gemini-3-flash",
+            ),
+            (
+                "Gemini 3 Flash - Next-gen lightweight reasoning (preview)",
+                "gemini-3-flash-preview",
+            ),
         ],
         "openrouter": [
-            ("Meta: Llama 4 Scout", "meta-llama/llama-4-scout:free"),
-            ("Meta: Llama 3.3 8B Instruct - A lightweight and ultra-fast variant of Llama 3.3 70B", "meta-llama/llama-3.3-8b-instruct:free"),
-            ("google/gemini-2.0-flash-exp:free - Gemini Flash 2.0 offers a significantly faster time to first token", "google/gemini-2.0-flash-exp:free"),
+            (
+                "Meta: Llama 4 Scout - Fast open-weight model",
+                "meta-llama/llama-4-scout",
+            ),
+            ("Meta: Llama 3.3 8B Instruct", "meta-llama/llama-3.3-8b-instruct"),
+            ("Meta: Llama 3.3 70B Instruct", "meta-llama/llama-3.3-70b-instruct"),
+            ("Google: Gemini 2.0 Flash (exp)", "google/gemini-2.0-flash-exp"),
+            ("DeepSeek R1 (reasoning)", "deepseek/deepseek-r1"),
         ],
         "ollama": [
-            ("llama3.1 local", "llama3.1"),
             ("llama3.2 local", "llama3.2"),
-        ]
+            ("llama3.3 local", "llama3.3"),
+            ("qwen2.5 local", "qwen2.5"),
+        ],
     }
+
+    if provider_key not in SHALLOW_AGENT_OPTIONS:
+        console.print(
+            f"\n[red]Unsupported LLM provider '{provider}'. Supported: {', '.join(SHALLOW_AGENT_OPTIONS.keys())}[/red]"
+        )
+        exit(1)
 
     choice = questionary.select(
         "Select Your [Quick-Thinking LLM Engine]:",
         choices=[
             questionary.Choice(display, value=value)
-            for display, value in SHALLOW_AGENT_OPTIONS[provider.lower()]
+            for display, value in SHALLOW_AGENT_OPTIONS[provider_key]
         ],
         instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
         style=questionary.Style(
@@ -180,48 +228,80 @@ def select_shallow_thinking_agent(provider) -> str:
     return choice
 
 
-def select_deep_thinking_agent(provider) -> str:
+def select_deep_thinking_agent(provider: str) -> str:
     """Select deep thinking llm engine using an interactive selection."""
+    provider_key = (provider or "").strip().lower()
 
     # Define deep thinking llm engine options with their corresponding model names
     DEEP_AGENT_OPTIONS = {
         "openai": [
-            ("GPT-4.1-nano - Ultra-lightweight model for basic operations", "gpt-4.1-nano"),
-            ("GPT-4.1-mini - Compact model with good performance", "gpt-4.1-mini"),
-            ("GPT-4o - Standard model with solid capabilities", "gpt-4o"),
-            ("o4-mini - Specialized reasoning model (compact)", "o4-mini"),
-            ("o3-mini - Advanced reasoning model (lightweight)", "o3-mini"),
+            ("o4-mini - Low-cost reasoning model (default)", "o4-mini"),
+            ("o4 - Higher-end reasoning model", "o4"),
+            ("o3-mini - Lightweight advanced reasoning", "o3-mini"),
             ("o3 - Full advanced reasoning model", "o3"),
-            ("o1 - Premier reasoning and problem-solving model", "o1"),
+            ("o1-preview - Legacy reasoning preview model", "o1-preview"),
+            ("o1-mini - Lower-cost long-horizon reasoning", "o1-mini"),
+            ("o1 - Premier long-horizon reasoning model", "o1"),
+            ("o1-pro - Extended context & planning", "o1-pro"),
+            ("GPT-5-mini - Strong reasoning at lower cost", "gpt-5-mini"),
+            ("GPT-5 - Flagship general intelligence model", "gpt-5"),
         ],
         "anthropic": [
-            ("Claude Haiku 3.5 - Fast inference and standard capabilities", "claude-3-5-haiku-latest"),
-            ("Claude Sonnet 3.5 - Highly capable standard model", "claude-3-5-sonnet-latest"),
-            ("Claude Sonnet 3.7 - Exceptional hybrid reasoning and agentic capabilities", "claude-3-7-sonnet-latest"),
-            ("Claude Sonnet 4 - High performance and excellent reasoning", "claude-sonnet-4-0"),
-            ("Claude Opus 4 - Most powerful Anthropic model", "	claude-opus-4-0"),
+            ("Claude Haiku 3.5 - Fast inference", "claude-3-5-haiku-latest"),
+            (
+                "Claude Sonnet 3.7 - Hybrid reasoning & tools",
+                "claude-3-7-sonnet-latest",
+            ),
+            ("Claude Sonnet 4 - High reasoning accuracy", "claude-sonnet-4-0"),
+            ("Claude Opus 4 - Most powerful Anthropic model", "claude-opus-4-0"),
         ],
         "google": [
-            ("Gemini 2.0 Flash-Lite - Cost efficiency and low latency", "gemini-2.0-flash-lite"),
-            ("Gemini 2.0 Flash - Next generation features, speed, and thinking", "gemini-2.0-flash"),
-            ("Gemini 2.5 Flash - Adaptive thinking, cost efficiency", "gemini-2.5-flash-preview-05-20"),
-            ("Gemini 2.5 Pro", "gemini-2.5-pro-preview-06-05"),
+            ("Gemini 2.5 Flash - Adaptive thinking (stable)", "gemini-2.5-flash"),
+            (
+                "Gemini 2.5 Flash - Adaptive thinking (preview)",
+                "gemini-2.5-flash-preview",
+            ),
+            ("Gemini 2.5 Pro - High-end reasoning (stable)", "gemini-2.5-pro"),
+            ("Gemini 2.5 Pro - High-end reasoning (preview)", "gemini-2.5-pro-preview"),
+            ("Gemini 3 Pro - Frontier reasoning & multimodal (stable)", "gemini-3-pro"),
+            (
+                "Gemini 3 Pro - Frontier reasoning & multimodal (preview)",
+                "gemini-3-pro-preview",
+            ),
         ],
         "openrouter": [
-            ("DeepSeek V3 - a 685B-parameter, mixture-of-experts model", "deepseek/deepseek-chat-v3-0324:free"),
-            ("Deepseek - latest iteration of the flagship chat model family from the DeepSeek team.", "deepseek/deepseek-chat-v3-0324:free"),
+            (
+                "DeepSeek V3 - 685B MoE flagship reasoning model",
+                "deepseek/deepseek-chat-v3",
+            ),
+            ("DeepSeek R1 - Strong reasoning model", "deepseek/deepseek-r1"),
+            (
+                "Qwen2.5 72B Instruct - Strong open reasoning",
+                "qwen/qwen2.5-72b-instruct",
+            ),
+            (
+                "Meta: Llama 3.3 70B Instruct - Strong general open-weight",
+                "meta-llama/llama-3.3-70b-instruct",
+            ),
         ],
         "ollama": [
-            ("llama3.1 local", "llama3.1"),
-            ("qwen3", "qwen3"),
-        ]
+            ("llama3.3 local", "llama3.3"),
+            ("qwen2.5 local", "qwen2.5"),
+            ("deepseek-r1 local", "deepseek-r1"),
+        ],
     }
-    
+
+    if provider_key not in DEEP_AGENT_OPTIONS:
+        console.print(
+            f"\n[red]Unsupported LLM provider '{provider}'. Supported: {', '.join(DEEP_AGENT_OPTIONS.keys())}[/red]"
+        )
+        exit(1)
+
     choice = questionary.select(
         "Select Your [Deep-Thinking LLM Engine]:",
         choices=[
             questionary.Choice(display, value=value)
-            for display, value in DEEP_AGENT_OPTIONS[provider.lower()]
+            for display, value in DEEP_AGENT_OPTIONS[provider_key]
         ],
         instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
         style=questionary.Style(
@@ -239,6 +319,7 @@ def select_deep_thinking_agent(provider) -> str:
 
     return choice
 
+
 def select_llm_provider() -> tuple[str, str]:
     """Select the OpenAI api url using interactive selection."""
     # Define OpenAI api options with their corresponding endpoints
@@ -247,9 +328,9 @@ def select_llm_provider() -> tuple[str, str]:
         ("Anthropic", "https://api.anthropic.com/"),
         ("Google", "https://generativelanguage.googleapis.com/v1"),
         ("Openrouter", "https://openrouter.ai/api/v1"),
-        ("Ollama", "http://localhost:11434/v1"),        
+        ("Ollama", "http://localhost:11434/v1"),
     ]
-    
+
     choice = questionary.select(
         "Select your LLM Provider:",
         choices=[
@@ -265,12 +346,12 @@ def select_llm_provider() -> tuple[str, str]:
             ]
         ),
     ).ask()
-    
+
     if choice is None:
         console.print("\n[red]no OpenAI backend selected. Exiting...[/red]")
         exit(1)
-    
+
     display_name, url = choice
     print(f"You selected: {display_name}\tURL: {url}")
-    
+
     return display_name, url
