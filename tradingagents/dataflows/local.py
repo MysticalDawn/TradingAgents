@@ -2,11 +2,36 @@ from typing import Annotated
 import pandas as pd
 import os
 from .config import DATA_DIR
+from .config import get_config
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import json
 from .reddit_utils import fetch_top_from_category
 from tqdm import tqdm
+
+
+def _find_latest_yfin_cache_file(symbol: str) -> str | None:
+    """Find the most recent Yahoo Finance cache CSV for a symbol in data_cache_dir."""
+    config = get_config()
+    cache_dir = config.get("data_cache_dir")
+    if not cache_dir or not os.path.isdir(cache_dir):
+        return None
+
+    sym = (symbol or "").upper()
+    candidates = []
+    for pat in (f"{sym}-YFin-data-*.csv", f"{sym.lower()}-YFin-data-*.csv"):
+        try:
+            for name in os.listdir(cache_dir):
+                if name.startswith(pat.split("*")[0]) and name.endswith(".csv"):
+                    candidates.append(os.path.join(cache_dir, name))
+        except FileNotFoundError:
+            return None
+
+    if not candidates:
+        return None
+
+    # Choose newest by mtime
+    return max(candidates, key=lambda p: os.path.getmtime(p))
 
 def get_YFin_data_window(
     symbol: Annotated[str, "ticker symbol of the company"],
@@ -18,16 +43,18 @@ def get_YFin_data_window(
     before = date_obj - relativedelta(days=look_back_days)
     start_date = before.strftime("%Y-%m-%d")
 
-    # read in data
-    data = pd.read_csv(
-        os.path.join(
-            DATA_DIR,
-            f"market_data/price_data/{symbol}-YFin-data-2015-01-01-2025-03-25.csv",
+    data_file = _find_latest_yfin_cache_file(symbol)
+    if not data_file:
+        return (
+            f"No local YFinance cache found for symbol '{symbol}'. "
+            f"Expected a file like '{symbol.upper()}-YFin-data-<start>-<end>.csv' in data_cache_dir."
         )
-    )
+
+    data = pd.read_csv(data_file)
 
     # Extract just the date part for comparison
-    data["DateOnly"] = data["Date"].str[:10]
+    date_col = "Date" if "Date" in data.columns else data.columns[0]
+    data["DateOnly"] = data[date_col].astype(str).str[:10]
 
     # Filter data between the start and end dates (inclusive)
     filtered_data = data[
@@ -53,21 +80,18 @@ def get_YFin_data(
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
     end_date: Annotated[str, "End date in yyyy-mm-dd format"],
 ) -> str:
-    # read in data
-    data = pd.read_csv(
-        os.path.join(
-            DATA_DIR,
-            f"market_data/price_data/{symbol}-YFin-data-2015-01-01-2025-03-25.csv",
+    data_file = _find_latest_yfin_cache_file(symbol)
+    if not data_file:
+        return (
+            f"No local YFinance cache found for symbol '{symbol}'. "
+            f"Expected a file like '{symbol.upper()}-YFin-data-<start>-<end>.csv' in data_cache_dir."
         )
-    )
 
-    if end_date > "2025-03-25":
-        raise Exception(
-            f"Get_YFin_Data: {end_date} is outside of the data range of 2015-01-01 to 2025-03-25"
-        )
+    data = pd.read_csv(data_file)
 
     # Extract just the date part for comparison
-    data["DateOnly"] = data["Date"].str[:10]
+    date_col = "Date" if "Date" in data.columns else data.columns[0]
+    data["DateOnly"] = data[date_col].astype(str).str[:10]
 
     # Filter data between the start and end dates (inclusive)
     filtered_data = data[
@@ -80,7 +104,11 @@ def get_YFin_data(
     # remove the index from the dataframe
     filtered_data = filtered_data.reset_index(drop=True)
 
-    return filtered_data
+    # Return as CSV text for tool compatibility
+    header = f"# Stock data for {symbol.upper()} from {start_date} to {end_date}\n"
+    header += f"# Total records: {len(filtered_data)}\n"
+    header += f"# Data source: local cache ({os.path.basename(data_file)})\n\n"
+    return header + filtered_data.to_csv(index=False)
 
 def get_finnhub_news(
     query: Annotated[str, "Search query or ticker symbol"],

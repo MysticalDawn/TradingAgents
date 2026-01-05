@@ -1,10 +1,33 @@
 from typing import Annotated
+import logging
+import os
 
 # Import from vendor-specific modules
-from .local import get_YFin_data, get_finnhub_news, get_finnhub_company_insider_sentiment, get_finnhub_company_insider_transactions, get_simfin_balance_sheet, get_simfin_cashflow, get_simfin_income_statements, get_reddit_global_news, get_reddit_company_news
-from .y_finance import get_YFin_data_online, get_stock_stats_indicators_window, get_balance_sheet as get_yfinance_balance_sheet, get_cashflow as get_yfinance_cashflow, get_income_statement as get_yfinance_income_statement, get_insider_transactions as get_yfinance_insider_transactions
+from .local import (
+    get_YFin_data,
+    get_finnhub_news,
+    get_finnhub_company_insider_sentiment,
+    get_finnhub_company_insider_transactions,
+    get_simfin_balance_sheet,
+    get_simfin_cashflow,
+    get_simfin_income_statements,
+    get_reddit_global_news,
+    get_reddit_company_news,
+)
+from .y_finance import (
+    get_YFin_data_online,
+    get_stock_stats_indicators_window,
+    get_balance_sheet as get_yfinance_balance_sheet,
+    get_cashflow as get_yfinance_cashflow,
+    get_income_statement as get_yfinance_income_statement,
+    get_insider_transactions as get_yfinance_insider_transactions,
+)
 from .google import get_google_news
-from .openai import get_stock_news_openai, get_global_news_openai, get_fundamentals_openai
+from .openai import (
+    get_stock_news_openai,
+    get_global_news_openai,
+    get_fundamentals_openai,
+)
 from .alpha_vantage import (
     get_stock as get_alpha_vantage_stock,
     get_indicator as get_alpha_vantage_indicator,
@@ -13,26 +36,24 @@ from .alpha_vantage import (
     get_cashflow as get_alpha_vantage_cashflow,
     get_income_statement as get_alpha_vantage_income_statement,
     get_insider_transactions as get_alpha_vantage_insider_transactions,
-    get_news as get_alpha_vantage_news
+    get_news as get_alpha_vantage_news,
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
 
 # Configuration and routing logic
 from .config import get_config
 
+logger = logging.getLogger(__name__)
+
 # Tools organized by category
 TOOLS_CATEGORIES = {
     "core_stock_apis": {
         "description": "OHLCV stock price data",
-        "tools": [
-            "get_stock_data"
-        ]
+        "tools": ["get_stock_data"],
     },
     "technical_indicators": {
         "description": "Technical analysis indicators",
-        "tools": [
-            "get_indicators"
-        ]
+        "tools": ["get_indicators"],
     },
     "fundamental_data": {
         "description": "Company fundamentals",
@@ -40,8 +61,8 @@ TOOLS_CATEGORIES = {
             "get_fundamentals",
             "get_balance_sheet",
             "get_cashflow",
-            "get_income_statement"
-        ]
+            "get_income_statement",
+        ],
     },
     "news_data": {
         "description": "News (public/insiders, original/processed)",
@@ -50,15 +71,16 @@ TOOLS_CATEGORIES = {
             "get_global_news",
             "get_insider_sentiment",
             "get_insider_transactions",
-        ]
-    }
+        ],
+    },
 }
 
 VENDOR_LIST = [
     "local",
     "yfinance",
     "openai",
-    "google"
+    "google",
+    "alpha_vantage",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -73,7 +95,7 @@ VENDOR_METHODS = {
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
-        "local": get_stock_stats_indicators_window
+        "local": get_stock_stats_indicators_window,
     },
     # fundamental_data
     "get_fundamentals": {
@@ -104,11 +126,9 @@ VENDOR_METHODS = {
     },
     "get_global_news": {
         "openai": get_global_news_openai,
-        "local": get_reddit_global_news
+        "local": get_reddit_global_news,
     },
-    "get_insider_sentiment": {
-        "local": get_finnhub_company_insider_sentiment
-    },
+    "get_insider_sentiment": {"local": get_finnhub_company_insider_sentiment},
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
@@ -116,12 +136,14 @@ VENDOR_METHODS = {
     },
 }
 
+
 def get_category_for_method(method: str) -> str:
     """Get the category that contains the specified method."""
     for category, info in TOOLS_CATEGORIES.items():
         if method in info["tools"]:
             return category
     raise ValueError(f"Method '{method}' not found in any category")
+
 
 def get_vendor(category: str, method: str = None) -> str:
     """Get the configured vendor for a data category or specific tool method.
@@ -138,30 +160,43 @@ def get_vendor(category: str, method: str = None) -> str:
     # Fall back to category-level configuration
     return config.get("data_vendors", {}).get(category, "default")
 
+
 def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""
+    config = get_config()
+    debug = bool(
+        config.get("debug")
+        or config.get("dataflows_debug")
+        or os.getenv("TRADINGAGENTS_DATAFLOWS_DEBUG") == "1"
+    )
+
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
 
     # Handle comma-separated vendors
-    primary_vendors = [v.strip() for v in vendor_config.split(',')]
+    primary_vendors = [v.strip() for v in vendor_config.split(",")]
 
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")
 
     # Get all available vendors for this method for fallback
     all_available_vendors = list(VENDOR_METHODS[method].keys())
-    
+
     # Create fallback vendor list: primary vendors first, then remaining vendors as fallbacks
     fallback_vendors = primary_vendors.copy()
     for vendor in all_available_vendors:
         if vendor not in fallback_vendors:
             fallback_vendors.append(vendor)
 
-    # Debug: Print fallback ordering
-    primary_str = " → ".join(primary_vendors)
-    fallback_str = " → ".join(fallback_vendors)
-    print(f"DEBUG: {method} - Primary: [{primary_str}] | Full fallback order: [{fallback_str}]")
+    if debug:
+        primary_str = " → ".join(primary_vendors)
+        fallback_str = " → ".join(fallback_vendors)
+        logger.debug(
+            "%s - Primary: [%s] | Full fallback order: [%s]",
+            method,
+            primary_str,
+            fallback_str,
+        )
 
     # Track results and execution state
     results = []
@@ -171,8 +206,12 @@ def route_to_vendor(method: str, *args, **kwargs):
 
     for vendor in fallback_vendors:
         if vendor not in VENDOR_METHODS[method]:
-            if vendor in primary_vendors:
-                print(f"INFO: Vendor '{vendor}' not supported for method '{method}', falling back to next vendor")
+            if vendor in primary_vendors and debug:
+                logger.info(
+                    "Vendor '%s' not supported for method '%s', falling back to next vendor",
+                    vendor,
+                    method,
+                )
             continue
 
         vendor_impl = VENDOR_METHODS[method][vendor]
@@ -183,14 +222,25 @@ def route_to_vendor(method: str, *args, **kwargs):
         if is_primary_vendor:
             any_primary_vendor_attempted = True
 
-        # Debug: Print current attempt
-        vendor_type = "PRIMARY" if is_primary_vendor else "FALLBACK"
-        print(f"DEBUG: Attempting {vendor_type} vendor '{vendor}' for {method} (attempt #{vendor_attempt_count})")
+        if debug:
+            vendor_type = "PRIMARY" if is_primary_vendor else "FALLBACK"
+            logger.debug(
+                "Attempting %s vendor '%s' for %s (attempt #%s)",
+                vendor_type,
+                vendor,
+                method,
+                vendor_attempt_count,
+            )
 
         # Handle list of methods for a vendor
         if isinstance(vendor_impl, list):
             vendor_methods = [(impl, vendor) for impl in vendor_impl]
-            print(f"DEBUG: Vendor '{vendor}' has multiple implementations: {len(vendor_methods)} functions")
+            if debug:
+                logger.debug(
+                    "Vendor '%s' has multiple implementations: %s functions",
+                    vendor,
+                    len(vendor_methods),
+                )
         else:
             vendor_methods = [(vendor_impl, vendor)]
 
@@ -198,47 +248,82 @@ def route_to_vendor(method: str, *args, **kwargs):
         vendor_results = []
         for impl_func, vendor_name in vendor_methods:
             try:
-                print(f"DEBUG: Calling {impl_func.__name__} from vendor '{vendor_name}'...")
+                if debug:
+                    logger.debug(
+                        "Calling %s from vendor '%s'...",
+                        impl_func.__name__,
+                        vendor_name,
+                    )
                 result = impl_func(*args, **kwargs)
                 vendor_results.append(result)
-                print(f"SUCCESS: {impl_func.__name__} from vendor '{vendor_name}' completed successfully")
-                    
+                if debug:
+                    logger.debug(
+                        "Completed %s from vendor '%s'",
+                        impl_func.__name__,
+                        vendor_name,
+                    )
+
             except AlphaVantageRateLimitError as e:
                 if vendor == "alpha_vantage":
-                    print(f"RATE_LIMIT: Alpha Vantage rate limit exceeded, falling back to next available vendor")
-                    print(f"DEBUG: Rate limit details: {e}")
+                    logger.warning(
+                        "Alpha Vantage rate limit exceeded, falling back to next available vendor: %s",
+                        e,
+                    )
                 # Continue to next vendor for fallback
                 continue
             except Exception as e:
                 # Log error but continue with other implementations
-                print(f"FAILED: {impl_func.__name__} from vendor '{vendor_name}' failed: {e}")
+                logger.warning(
+                    "%s from vendor '%s' failed: %s",
+                    impl_func.__name__,
+                    vendor_name,
+                    e,
+                )
                 continue
 
         # Add this vendor's results
         if vendor_results:
             results.extend(vendor_results)
             successful_vendor = vendor
-            result_summary = f"Got {len(vendor_results)} result(s)"
-            print(f"SUCCESS: Vendor '{vendor}' succeeded - {result_summary}")
-            
+            if debug:
+                logger.debug(
+                    "Vendor '%s' succeeded - got %s result(s)",
+                    vendor,
+                    len(vendor_results),
+                )
+
             # Stopping logic: Stop after first successful vendor for single-vendor configs
             # Multiple vendor configs (comma-separated) may want to collect from multiple sources
             if len(primary_vendors) == 1:
-                print(f"DEBUG: Stopping after successful vendor '{vendor}' (single-vendor config)")
+                if debug:
+                    logger.debug(
+                        "Stopping after successful vendor '%s' (single-vendor config)",
+                        vendor,
+                    )
                 break
         else:
-            print(f"FAILED: Vendor '{vendor}' produced no results")
+            if debug:
+                logger.debug("Vendor '%s' produced no results", vendor)
 
     # Final result summary
     if not results:
-        print(f"FAILURE: All {vendor_attempt_count} vendor attempts failed for method '{method}'")
+        logger.error(
+            "All %s vendor attempts failed for method '%s'",
+            vendor_attempt_count,
+            method,
+        )
         raise RuntimeError(f"All vendor implementations failed for method '{method}'")
-    else:
-        print(f"FINAL: Method '{method}' completed with {len(results)} result(s) from {vendor_attempt_count} vendor attempt(s)")
+    elif debug:
+        logger.debug(
+            "Method '%s' completed with %s result(s) from %s vendor attempt(s)",
+            method,
+            len(results),
+            vendor_attempt_count,
+        )
 
     # Return single result if only one, otherwise concatenate as string
     if len(results) == 1:
         return results[0]
     else:
         # Convert all results to strings and concatenate
-        return '\n'.join(str(result) for result in results)
+        return "\n".join(str(result) for result in results)

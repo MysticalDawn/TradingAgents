@@ -203,17 +203,23 @@ def _get_stock_stats_bulk(
     online = config["data_vendors"]["technical_indicators"] != "local"
     
     if not online:
-        # Local data path
-        try:
-            data = pd.read_csv(
-                os.path.join(
-                    config.get("data_cache_dir", "data"),
-                    f"{symbol}-YFin-data-2015-01-01-2025-03-25.csv",
-                )
+        # Local cached data path (pick the most recent cache for this symbol)
+        cache_dir = config.get("data_cache_dir", "data")
+        candidates = []
+        sym = symbol.upper()
+        if os.path.isdir(cache_dir):
+            for name in os.listdir(cache_dir):
+                if name.startswith(f"{sym}-YFin-data-") and name.endswith(".csv"):
+                    candidates.append(os.path.join(cache_dir, name))
+
+        if not candidates:
+            raise Exception(
+                f"Stockstats fail: no cached Yahoo Finance CSV found for {sym} in {cache_dir}"
             )
-            df = wrap(data)
-        except FileNotFoundError:
-            raise Exception("Stockstats fail: Yahoo Finance data not fetched yet!")
+
+        data_file = max(candidates, key=lambda p: os.path.getmtime(p))
+        data = pd.read_csv(data_file)
+        df = wrap(data)
     else:
         # Online data fetching with caching
         today_date = pd.Timestamp.today()

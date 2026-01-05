@@ -14,8 +14,8 @@ from tenacity import (
 
 
 def is_rate_limited(response):
-    """Check if the response indicates rate limiting (status code 429)"""
-    return response.status_code == 429
+    """Check if the response indicates throttling or transient blocking."""
+    return response.status_code in (429, 503)
 
 
 @retry(
@@ -27,7 +27,7 @@ def make_request(url, headers):
     """Make a request with retry logic for rate limiting"""
     # Random delay before each request to avoid detection
     time.sleep(random.uniform(2, 6))
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=20)
     return response
 
 
@@ -65,6 +65,12 @@ def getNewsData(query, start_date, end_date):
 
         try:
             response = make_request(url, headers)
+            if response.status_code != 200:
+                # Let the retry policy handle transient codes (e.g., 429/503). For others, stop paging.
+                if is_rate_limited(response):
+                    continue
+                break
+
             soup = BeautifulSoup(response.content, "html.parser")
             results_on_page = soup.select("div.SoaBEf")
 

@@ -63,7 +63,7 @@ def _make_api_request(function_name: str, params: dict) -> dict | str:
         # Remove entitlement if it's None or empty
         api_params.pop("entitlement", None)
     
-    response = requests.get(API_BASE_URL, params=api_params)
+    response = requests.get(API_BASE_URL, params=api_params, timeout=30)
     response.raise_for_status()
 
     response_text = response.text
@@ -72,10 +72,25 @@ def _make_api_request(function_name: str, params: dict) -> dict | str:
     try:
         response_json = json.loads(response_text)
         # Check for rate limit error
+        info_message = None
         if "Information" in response_json:
             info_message = response_json["Information"]
-            if "rate limit" in info_message.lower() or "api key" in info_message.lower():
-                raise AlphaVantageRateLimitError(f"Alpha Vantage rate limit exceeded: {info_message}")
+        elif "Note" in response_json:
+            # Alpha Vantage frequently uses "Note" for call frequency/rate limit messaging
+            info_message = response_json["Note"]
+        elif "Error Message" in response_json:
+            raise ValueError(f"Alpha Vantage error: {response_json['Error Message']}")
+
+        if info_message:
+            msg = str(info_message)
+            if (
+                "rate limit" in msg.lower()
+                or "call frequency" in msg.lower()
+                or "api key" in msg.lower()
+            ):
+                raise AlphaVantageRateLimitError(
+                    f"Alpha Vantage rate limit exceeded: {msg}"
+                )
     except json.JSONDecodeError:
         # Response is not JSON (likely CSV data), which is normal
         pass

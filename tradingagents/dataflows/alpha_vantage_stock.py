@@ -35,4 +35,8 @@ def get_stock(
 
     response = _make_api_request("TIME_SERIES_DAILY_ADJUSTED", params)
 
-    return _filter_csv_by_date_range(response, start_date, end_date)
+    filtered = _filter_csv_by_date_range(response, start_date, end_date)
+    header = f"# Stock data for {symbol.upper()} from {start_date} to {end_date}\n"
+    header += f"# Data source: Alpha Vantage TIME_SERIES_DAILY_ADJUSTED (outputsize={outputsize})\n"
+    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    return header + filtered
