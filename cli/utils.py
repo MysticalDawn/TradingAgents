@@ -134,6 +134,7 @@ def select_shallow_thinking_agent(provider: str) -> str:
     SHALLOW_AGENT_OPTIONS = {
         "openai": [
             ("GPT-4.1 - High quality general model", "gpt-4.1"),
+            ("GPT-5.2 - Latest flagship (fast mode)", "gpt-5.2"),
             ("GPT-5-nano - Ultra-fast and ultra-cheap for trivial tasks", "gpt-5-nano"),
             ("GPT-5-mini - Fast general-purpose lightweight model", "gpt-5-mini"),
             (
@@ -146,6 +147,7 @@ def select_shallow_thinking_agent(provider: str) -> str:
             ("o4-mini - Low-cost reasoning model (good default)", "o4-mini"),
         ],
         "anthropic": [
+            ("Claude Sonnet 4.5 - Latest flagship", "claude-4-5-sonnet-latest"),
             (
                 "Claude Haiku 3.5 - Fast inference and low cost",
                 "claude-3-5-haiku-latest",
@@ -245,6 +247,7 @@ def select_deep_thinking_agent(provider: str) -> str:
             ("o1-pro - Extended context & planning", "o1-pro"),
             ("GPT-5-mini - Strong reasoning at lower cost", "gpt-5-mini"),
             ("GPT-5 - Flagship general intelligence model", "gpt-5"),
+            ("GPT-5.2 - Latest flagship (reasoning)", "gpt-5.2"),
         ],
         "anthropic": [
             ("Claude Haiku 3.5 - Fast inference", "claude-3-5-haiku-latest"),
@@ -254,6 +257,8 @@ def select_deep_thinking_agent(provider: str) -> str:
             ),
             ("Claude Sonnet 4 - High reasoning accuracy", "claude-sonnet-4-0"),
             ("Claude Opus 4 - Most powerful Anthropic model", "claude-opus-4-0"),
+            ("Claude Sonnet 4.5 - Latest flagship", "claude-4-5-sonnet-latest"),
+            ("Claude Opus 4.5 - Latest flagship", "claude-4-5-opus-latest"),
         ],
         "google": [
             ("Gemini 2.5 Flash - Adaptive thinking (stable)", "gemini-2.5-flash"),
